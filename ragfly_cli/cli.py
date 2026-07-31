@@ -32,6 +32,7 @@ import sys
 
 import click
 import httpx
+from urllib.parse import quote
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -1023,6 +1024,88 @@ def cloud_catalogo(tipo: str, output: str):
     if not funciones and not habilidades:
         console.print("[dim]No capabilities available for this context.[/dim]")
     console.print()
+
+@cloud.group("agent")
+def cloud_agent():
+    """AgentContext and its authorized operations."""
+
+
+@cloud_agent.command("context")
+@click.option(
+    "--profile",
+    type=click.Choice(["chat_usuario", "chat_soporte"]),
+    default="chat_usuario",
+    show_default=True,
+)
+@click.option("-o", "--output", type=click.Choice(["table", "json"]), default="json")
+def cloud_agent_context(profile: str, output: str):
+    """Show the authenticated AgentContext for a functional profile."""
+    from .cloud_commands import cloud_get
+    from .oop import CliCommand
+
+    data = CliCommand().protegido(
+        cloud_get,
+        "/agent/context",
+        params={"function_profile": profile},
+    )
+    if output == "json":
+        _emit_json(data)
+        return
+    table = Table(title="Agent context")
+    table.add_column("Profile")
+    table.add_column("Hash")
+    table.add_column("Tools", justify="right")
+    table.add_row(
+        str(data.get("function_profile") or "—"),
+        str(data.get("system_prompt_hash") or "—"),
+        str(len(data.get("tools") or [])),
+    )
+    console.print(table)
+
+
+@cloud_agent.command("tool")
+@click.argument("public_name")
+@click.option("--arguments-json", default="{}", show_default=True)
+@click.option(
+    "--profile",
+    type=click.Choice(["chat_usuario", "chat_soporte"]),
+    default="chat_usuario",
+    show_default=True,
+)
+@click.option("-o", "--output", type=click.Choice(["table", "json"]), default="json")
+def cloud_agent_tool(
+    public_name: str,
+    arguments_json: str,
+    profile: str,
+    output: str,
+):
+    """Run one operation authorized by the AgentContext."""
+    from .cloud_commands import cloud_post
+    from .oop import CliCommand
+
+    try:
+        arguments = json.loads(arguments_json)
+    except json.JSONDecodeError as exc:
+        raise click.UsageError(f"--arguments-json is not valid JSON: {exc}") from exc
+    if not isinstance(arguments, dict):
+        raise click.UsageError("--arguments-json must encode a JSON object")
+
+    data = CliCommand().protegido(
+        cloud_post,
+        f"/agent/tools/{quote(public_name, safe='')}",
+        params={"function_profile": profile},
+        body={"arguments": arguments},
+    )
+    if output == "json":
+        _emit_json(data)
+        return
+    console.print_json(data=data)
+
+
+# Spanish compatibility aliases.
+cloud.add_command(cloud_agent, name="agente")
+cloud_agent.add_command(cloud_agent_context, name="contexto")
+
 
 
 # compat alias (Spanish)

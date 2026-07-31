@@ -24,7 +24,7 @@ from . import keyring_store
 
 # ── Constantes ───────────────────────────────────────────────────────────────
 
-CLOUD_URL = "https://api.ragfly.ai"
+CLOUD_URL = os.environ.get("RAGFLY_BASE_URL", "https://api.ragfly.ai").rstrip("/")
 LEGACY_CREDENTIALS_PATH = Path.home() / ".ragfly" / "credentials.json"
 
 
