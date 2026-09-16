@@ -19,12 +19,15 @@ ragfly cloud me
 ## Authentication
 
 ```bash
-# Interactive (JWT, stored in the OS keyring)
+# A person (JWT, stored in the OS keyring)
 ragfly login
 
-# Non-interactive / CI (API key, no expiry)
-export RAGFLY_API_KEY=slm_live_xxxxxxxxxx
+# Non-interactive / CI / agents (API key, only reaches /v1)
+export RAGFLY_API_KEY=rf_xxxxxxxxxx
 ```
+
+`cloud group` and `cloud api-key` manage a person's session and credentials: they
+need `ragfly login`, and the server refuses them for an API key.
 
 ## `RAGFLY_ROOT` (optional) — open original files on disk
 
@@ -50,39 +53,55 @@ absolute). Step-by-step walkthrough:
 ```
 ragfly
 ├── login / logout / version
-└── cloud                    ← operations against api.ragfly.ai
+└── cloud                      ← the English REST /v1 contract of api.ragfly.ai
     ├── me
-    ├── group       list | switch | clear
-    ├── api-key     create | list | revoke
-    ├── document    list | show | edges
-    ├── space       list | show
-    ├── queue       show | runs
-    ├── skill       list | show | run
+    ├── group          list | switch | clear      (signed-in person)
+    ├── api-key        create | list | revoke     (signed-in person)
+    ├── document       list | show | edges
+    ├── space          list | show
+    ├── queue          show | runs
+    ├── skill          list | show | run
     ├── catalog
+    ├── function       show
     ├── search
-    └── chat        ask
+    ├── chat           ask
+    ├── agent          context | tool
+    ├── usage
+    ├── conversation   list | delete
+    ├── process        list | show | update
+    ├── organization   show | update | draft
+    └── operation      list | show | run
 ```
 
-Codes are English on the wire: filter and read catalog codes in English
-(`--status VECTORIZED`, `codigo_estado_doc: VECTORIZED`, skill code `SUMMARIZE_DOCUMENT`).
-The CLI translates them to RAGfly's internal codes at its edge, using the same
-public-code map as the MCP server (`GET /catalogo/public-codes`). The former
-Spanish command/flag names (`documento listar`, `--estado`) still work as
-compatibility aliases.
+Every operation of the RAGfly application is available through `cloud operation`,
+with the same permissions and audit as the web app:
 
 ```bash
-ragfly cloud document list --status VECTORIZED --limit 20
+ragfly cloud operation list
+ragfly cloud operation show document_types.update          # input/output schema
+ragfly cloud operation run document_types.update --input-json '{"code": "TDOC_...", "name": "Invoices"}'
+
+# write_confirm operations (deletes, reverts, resets) only run with --confirm
+ragfly cloud operation run document_types.delete --input-json @input.json --confirm
+```
+
+`--input-json` takes inline JSON, `@file` or `-` (stdin). Never put secrets in it.
+Output is English end to end (`--status VECTORIZED`, `-o json | jq`).
+
+```bash
+ragfly cloud document list --status VECTORIZED --limit 20 -o id
 ragfly cloud skill run SUMMARIZE_DOCUMENT --space 12
 ragfly cloud search "Q1 revenue"
 ```
 
-Full reference: <https://api.ragfly.ai/docs> and `docs/integradores/CLI.md`.
+Full reference: <https://api.ragfly.ai/docs>.
 
 > **Local operations** (`ragfly local scan/sync/daemon`) require the local file
 > worker and ship with **RAGfly Desktop**, not with this package.
 
-## Source
+## Relation to RAGfly Desktop
 
-The command logic is extracted from the RAGfly Desktop client
-(`cliente/ragfly/`). Canonical source of each module lives there; keep this
-package's copies in sync when the cloud command surface changes.
+RAGfly Desktop bundles its own `ragfly` binary with the local commands and a
+signed-in person's session. This package is the standalone cloud surface: since
+1.19.0 its `cloud` commands use only the public `/v1` contract, so they no longer
+mirror the Desktop copy.
