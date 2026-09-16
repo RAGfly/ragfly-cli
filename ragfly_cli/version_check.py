@@ -88,9 +88,9 @@ def chequear_actualizacion(
 
     obligatoria = data.get("obligatoria", False)
     notas = data.get("notas") or ""
-    prefix = "⚠️  ACTUALIZACIÓN OBLIGATORIA" if obligatoria else "ℹ️  Hay una nueva versión disponible"
+    prefix = "⚠️  MANDATORY UPDATE" if obligatoria else "ℹ️  A new version is available"
 
-    msg = f"{prefix}: RAGfly Desktop v{latest} (tu versión: v{__version__})"
+    msg = f"{prefix}: RAGfly Desktop v{latest} (your version: v{__version__})"
     if notas:
         msg += f"\n   {notas}"
     return msg

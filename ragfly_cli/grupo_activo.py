@@ -49,7 +49,7 @@ def set_grupo_activo(codigo_grupo: str) -> None:
     path = _config_path()
     if not path.exists():
         raise FileNotFoundError(
-            f"No existe {path}. Ejecuta `ragfly setup` primero."
+            f"{path} does not exist. Run `ragfly setup` first."
         )
 
     content = path.read_text()
