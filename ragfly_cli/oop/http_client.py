@@ -9,7 +9,7 @@ Encapsula el patrón repetido en `cloud_commands.py`:
     except httpx.HTTPStatusError as e:
         _manejar_http_error(e)
     except httpx.RequestError as e:
-        raise CloudError(f"Connection error: {e}", exit_code=2)
+        raise CloudError(f"Could not connect to the server: {e}", exit_code=2)
 
 Ejemplo:
     from ragfly_cli.oop import CloudHttpClient
@@ -99,7 +99,7 @@ class CloudHttpClient:
         except httpx.HTTPStatusError as e:
             _manejar_http_error(e)
         except httpx.RequestError as e:
-            raise CloudError(f"Connection error: {e}", exit_code=2)
+            raise CloudError(f"Could not connect to the server: {e}", exit_code=2)
 
     # ── Verbos HTTP ───────────────────────────────────────────────────────────
 
