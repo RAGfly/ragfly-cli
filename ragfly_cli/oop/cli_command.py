@@ -74,10 +74,10 @@ class CliCommand:
         except SystemExit:
             raise
         except KeyboardInterrupt:
-            self.aviso("Interrumpido.")
+            self.aviso("Interrupted.")
             raise SystemExit(130)
         except Exception as e:
-            self.error(f"Error inesperado: {e}")
+            self.error(f"Unexpected error: {e}")
             raise SystemExit(on_unexpected_exit_code)
 
     def salir(self, mensaje: str, exit_code: int = 1) -> NoReturn:
