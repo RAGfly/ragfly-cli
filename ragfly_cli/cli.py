@@ -236,6 +236,32 @@ def cloud_me(output: str):
             ("Active group", "group"), ("Active entity", "entity")])
 
 
+# ── cloud entity ────────────────────────────────────────────────────────────
+
+@cloud.group("entity")
+def cloud_entity():
+    """Active entity focus for the authenticated credential."""
+
+
+@cloud_entity.command("set")
+@click.argument("entity_code", required=False)
+@click.option("--release", is_flag=True, help="Release the focus and use all authorized entities.")
+@click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
+def cloud_entity_set(entity_code: str | None, release: bool, output: str):
+    """Set ENTITY_CODE as active, or use --release to clear the focus."""
+    if release == (entity_code is not None):
+        raise click.UsageError("Pass exactly one of ENTITY_CODE or --release.")
+    data = _v1(
+        "POST", "/v1/session/active-entity",
+        body={"entity_code": None if release else entity_code},
+    )
+    if output == "json":
+        _emit_json(data)
+        return
+    active = data.get("active_entity") or "all authorized entities"
+    console.print(f"[green]✓ Active entity:[/green] [bold]{active}[/bold]")
+
+
 # ── cloud group (signed-in person only) ──────────────────────────────────────
 
 @cloud.group("group")
