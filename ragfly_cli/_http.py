@@ -41,9 +41,8 @@ def default_headers(
     Returns:
         dict de headers listo para pasar a httpx.
 
-    El header `X-Override-Grupo` se envía cuando hay grupo activo configurado
-    o explícito. El backend lo respeta como override de sesión (mismo patrón
-    que el dropdown de grupo del frontend web).
+    El header `X-Override-Grupo` solo se envía para una sesión humana. Una API
+    key tiene un grupo fijo en el servidor y nunca hereda el grupo local del CLI.
     """
     from ragfly_cli import __version__ as _client_version
 
@@ -53,14 +52,17 @@ def default_headers(
     if content_type:
         headers["Content-Type"] = "application/json"
 
-    # Resolver grupo activo: explícito > config
-    grupo = grupo_override
-    if grupo is None:
-        try:
-            from .config import get_config
-            grupo = get_config().codigo_grupo or None
-        except Exception:
-            grupo = None
+    # El override pertenece a la sesión humana. Enviar el grupo guardado en
+    # otra sesión con una API key puede dar 403 y nunca debe cambiar su alcance.
+    grupo = None
+    if not (token and token.startswith(("rf_", "slm_live_"))):
+        grupo = grupo_override
+        if grupo is None:
+            try:
+                from .config import get_config
+                grupo = get_config().codigo_grupo or None
+            except Exception:
+                grupo = None
     if grupo:
         headers["X-Override-Grupo"] = grupo
 
