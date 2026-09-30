@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.1
+
+- Keep a saved human session's group override out of requests authenticated with
+  an API key. This prevents a 403 when an agent lists or executes public `/v1`
+  operations after the CLI has previously been used interactively.
+
 ## 1.19.0
 
 - Every `cloud` command talks to the English REST `/v1` contract, so an API key

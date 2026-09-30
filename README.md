@@ -29,24 +29,24 @@ export RAGFLY_API_KEY=rf_xxxxxxxxxx
 `cloud group` and `cloud api-key` manage a person's session and credentials: they
 need `ragfly login`, and the server refuses them for an API key.
 
-## `RAGFLY_ROOT` (optional) — open original files on disk
+## Opening an original file on disk (optional)
 
-Searching, asking and citing need zero extra config. Only if a script or agent
-on this machine must open the **original file** on disk, set `RAGFLY_ROOT` once:
-it is the **parent folder** of the folder you selected when uploading your
-documents via the web app. RAGfly never reads it nor stores your absolute
-path — documents uploaded via browser carry a *relative* `ruta_archivo`, and
-the real path is `$RAGFLY_ROOT + ruta_archivo`.
+Searching and citing need no local path setup. A document result may include an
+`fs` object. For a local relative file, read `fs.home_var` and join that
+environment variable's value with `fs.relative_path`. Each root has its own
+variable; configure only the roots available on this machine.
 
 ```bash
-# Example: you uploaded /Users/ana/Dropbox/MisDocumentos → the PARENT is the root
-echo 'export RAGFLY_ROOT="/Users/ana/Dropbox"' >> ~/.zshrc
-# "/MisDocumentos/letras/cancion.txt" → /Users/ana/Dropbox/MisDocumentos/letras/cancion.txt
+export RAGFLY_HOME_442681="/Users/ana/Dropbox"
+export RAGFLY_HOME_991203="/Volumes/Archive"
 ```
 
-Not needed for documents loaded via RAGfly Desktop (their paths are already
-absolute). Step-by-step walkthrough:
-<https://ragfly.ai/build/mcp#setting-up-ragfly_root--once-per-machine-in-3-steps>
+If `fs.is_cloud_only` is true, use the authorized cloud provider. If
+`fs.is_public_url` is true, open its public URL. If `fs.is_absolute` is true,
+use the absolute path on the machine where it exists. If `fs.home_var` is null
+or unset, do not guess a local root. See the
+[MCP guide](https://ragfly.ai/build/mcp#opening-a-document-on-disk-fs-block)
+for the full order and examples.
 
 ## Command surface
 
