@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.20.0 — 2026-10-07
 
 - `cloud chat ask --mode help` answers questions about RAGfly itself, without links to web screens.
 - `cloud search --space ID --filter JSON` (inline, `@file` or `-`) for the structured filter and working-space scope.
