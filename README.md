@@ -58,10 +58,12 @@ ragfly
     ├── group          list | switch | clear      (signed-in person)
     ├── api-key        create | list | revoke     (signed-in person)
     ├── document       list | show | edges
-    ├── space          list | show
+    ├── space          list | show | compose | read | refresh | promote
     ├── queue          show | runs
     ├── skill          list | show | run
     ├── catalog
+    ├── document-type  list
+    ├── characteristic list
     ├── function       show
     ├── search
     ├── chat           ask
@@ -92,6 +94,8 @@ Output is English end to end (`--status VECTORIZED`, `-o json | jq`).
 ragfly cloud document list --status VECTORIZED --limit 20 -o id
 ragfly cloud skill run SUMMARIZE_DOCUMENT --space 12
 ragfly cloud search "Q1 revenue"
+ragfly cloud search "statements" --filter @filter.json --space 12
+ragfly cloud chat ask "How do I release the entity of my key?" --mode help
 ```
 
 Full reference: <https://api.ragfly.ai/docs>.

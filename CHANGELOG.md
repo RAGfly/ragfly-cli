@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `cloud chat ask --mode help` answers questions about RAGfly itself, without links to web screens.
+- `cloud search --space ID --filter JSON` (inline, `@file` or `-`) for the structured filter and working-space scope.
+- New `cloud document-type list`, `cloud characteristic list` and `cloud space compose | read | refresh | promote`, matching the SDKs and MCP.
+
 ## 1.19.1
 
 - Keep a saved human session's group override out of requests authenticated with

@@ -439,6 +439,48 @@ def cloud_space_show(space_id: int, document_limit: int, output: str):
     _table("Documents", data.get("documents") or [], [("Code", "code"), ("Name", "name"), ("Status", "status")])
 
 
+@cloud_space.command("compose")
+@click.argument("operation", type=click.Choice(["union", "intersection", "difference", "symmetric_difference"]))
+@click.argument("space_a", type=int)
+@click.argument("space_b", type=int)
+@click.option("--name", default="", help="Name of the result (generated when empty)")
+@click.option("--type", "space_type", type=click.Choice(["AREA", "SPACE"]), default="AREA", show_default=True)
+@click.option("-o", "--output", type=OUTPUT_TABLE, default="json")
+def cloud_space_compose(operation: str, space_a: int, space_b: int, name: str, space_type: str, output: str):
+    """Combine two working spaces by set algebra into a new one."""
+    data = _v1("POST", "/v1/spaces/compose", body={
+        "operation": operation, "space_id_a": space_a, "space_id_b": space_b,
+        "name": name, "space_type": space_type,
+    })
+    _emit_json(data) if output == "json" else _fields("New working space", data, [
+        ("ID", "space_id"), ("Name", "name"), ("Type", "type"), ("Documents", "total_documents")])
+
+
+@cloud_space.command("read")
+@click.argument("space_id", type=int)
+@click.option("--resolution", type=click.Choice(["count", "manifest", "chunks", "text"]), default="manifest", show_default=True)
+@click.option("--query", default="", help="Sub-question to rank by (required with --resolution chunks)")
+@click.option("--limit", type=int, default=50, show_default=True)
+def cloud_space_read(space_id: int, resolution: str, query: str, limit: int):
+    """Read a working space at the chosen resolution (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/read",
+                   body={"resolution": resolution, "query": query, "limit": limit}))
+
+
+@cloud_space.command("refresh")
+@click.argument("space_id", type=int)
+def cloud_space_refresh(space_id: int):
+    """Recompute the members of a working space (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/refresh"))
+
+
+@cloud_space.command("promote")
+@click.argument("space_id", type=int)
+def cloud_space_promote(space_id: int):
+    """Turn a temporary working space into a permanent one (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/promote"))
+
+
 # ── cloud queue ──────────────────────────────────────────────────────────────
 
 @cloud.group("queue")
@@ -534,6 +576,38 @@ def cloud_catalog(type_: str, output: str):
         _table("Skills", data["skills"], [("Code", "code"), ("Name", "name"), ("Applies to", "applies_to")])
 
 
+@cloud.group("document-type")
+def cloud_document_type():
+    """Document types of an entity: the codes `search --filter` accepts."""
+
+
+@cloud_document_type.command("list")
+@click.option("--entity", default=None, help="Entity code (defaults to the active entity)")
+@click.option("-o", "--output", type=OUTPUT_LIST, default="table")
+def cloud_document_type_list(entity: str | None, output: str):
+    """List the document types of the entity, with their parent type."""
+    data = _v1("GET", "/v1/catalog/document-types", params={"entity_code": entity})
+    _list(data, output, key="document_types", id_key="code", title="Document types",
+          columns=[("Code", "code"), ("Name", "name"), ("Parent", "parent_code"), ("Documents", "document_count")])
+
+
+@cloud.group("characteristic")
+def cloud_characteristic():
+    """Content characteristics of the document types: the codes `search --filter` accepts."""
+
+
+@cloud_characteristic.command("list")
+@click.option("--document-type", "document_types", multiple=True, help="Document type code (repeat for several)")
+@click.option("--entity", default=None, help="Entity code (defaults to the active entity)")
+@click.option("-o", "--output", type=OUTPUT_LIST, default="table")
+def cloud_characteristic_list(document_types: tuple[str, ...], entity: str | None, output: str):
+    """List the characteristics available for those types (all when none is given)."""
+    data = _v1("GET", "/v1/catalog/characteristics", params={
+        "document_types": ",".join(document_types) or None, "entity_code": entity})
+    _list(data, output, key="characteristics", id_key="code", title="Characteristics",
+          columns=[("Category", "category_code"), ("Code", "code"), ("Name", "name"), ("Role", "role")])
+
+
 @cloud.group("function")
 def cloud_function():
     """Functions (screens) of the RAGfly application."""
@@ -557,8 +631,12 @@ def cloud_function_show(function_code: str, output: str):
 @click.option("--limit", type=int, default=10, show_default=True)
 @click.option("--min-similarity", type=float, default=0.0, show_default=True)
 @click.option("--entity", default=None, help="Filter by entity code")
+@click.option("--space", "space_id", type=int, default=None, help="Search only inside this working space")
+@click.option("--filter", "filter_json", default=None,
+              help="Structured filter as JSON, @file or - (document_types, attributes, characteristics)")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
-def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, entity: str | None, output: str):
+def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, entity: str | None,
+                 space_id: int | None, filter_json: str | None, output: str):
     """Semantic search over the group's vectorized documents."""
     text = " ".join(query).strip()
     if not text:
@@ -566,6 +644,10 @@ def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, enti
     body = {"query": text, "limit": limit, "min_similarity": min_similarity}
     if entity:
         body["entity_code"] = entity
+    if space_id is not None:
+        body["space_id"] = space_id
+    if filter_json:
+        body["filter"] = _json_argument(filter_json, "--filter")
     data = _v1("POST", "/v1/documents/search", body=body)
     if output == "json":
         _emit_json(data)
@@ -587,8 +669,10 @@ def cloud_chat():
 @click.argument("message", nargs=-1, required=True)
 @click.option("--function", "function_code", default="CHAT-USER", show_default=True, help="Chat function code")
 @click.option("--conversation", "conversation_id", type=int, default=None, help="Continue an existing conversation")
+@click.option("--mode", type=click.Choice(["default", "help"]), default=None,
+              help="help: answer questions about RAGfly itself (how to use or integrate it), without links to web screens")
 @click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text")
-def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id: int | None, output: str):
+def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id: int | None, mode: str | None, output: str):
     """Ask a question. Creates a conversation unless --conversation is given."""
     question = " ".join(message).strip()
     if not question:
@@ -596,6 +680,8 @@ def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id
     body = {"question": question, "function_code": function_code}
     if conversation_id:
         body["conversation_id"] = conversation_id
+    if mode:
+        body["mode"] = mode
     data = _v1("POST", "/v1/ask", body=body)
     if output == "json":
         _emit_json(data)
