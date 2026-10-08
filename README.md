@@ -55,6 +55,9 @@ ragfly
 ├── login / logout / version
 └── cloud                      ← the English REST /v1 contract of api.ragfly.ai
     ├── me
+    ├── entity         set [ENTITY_CODE] | set --clear
+    ├── area           set [AREA_CODE] | set --release | list
+    ├── location       list
     ├── group          list | switch | clear      (signed-in person)
     ├── api-key        create | list | revoke     (signed-in person)
     ├── document       list | show | edges

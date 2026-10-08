@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0 — 2026-10-08
+
+- New `cloud area set AREA_CODE | set --release | list` and `cloud location list` (`--entity`, `--parent`, `--query`, `--limit`, `--cursor`), matching the SDKs and MCP.
+- `--location CODE` narrows `cloud search`, `cloud document list` and `cloud chat ask` to one visible folder subtree, for that request only.
+- `cloud entity set --clear` is the published flag; `--release` stays as an alias. `cloud me` shows the active and effective area.
+
 ## 1.20.0 — 2026-10-07
 
 - `cloud chat ask --mode help` answers questions about RAGfly itself, without links to web screens.

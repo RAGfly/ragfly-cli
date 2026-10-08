@@ -231,9 +231,11 @@ def cloud_me(output: str):
         _fields("Session", {
             "user": user.get("code"), "name": user.get("name"), "profile": data.get("profile"),
             "roles": ", ".join(data.get("roles") or []), "group": data.get("active_group"),
-            "entity": data.get("active_entity"),
+            "entity": data.get("active_entity"), "area": data.get("active_area"),
+            "effective_area": data.get("effective_area"),
         }, [("User", "user"), ("Name", "name"), ("Profile", "profile"), ("Roles", "roles"),
-            ("Active group", "group"), ("Active entity", "entity")])
+            ("Active group", "group"), ("Active entity", "entity"), ("Active area", "area"),
+            ("Effective area", "effective_area")])
 
 
 # ── cloud entity ────────────────────────────────────────────────────────────
@@ -245,12 +247,13 @@ def cloud_entity():
 
 @cloud_entity.command("set")
 @click.argument("entity_code", required=False)
-@click.option("--release", is_flag=True, help="Release the focus and use all authorized entities.")
+@click.option("--clear", "--release", "release", is_flag=True,
+              help="Clear the focus and use all authorized entities (--release is an alias).")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
 def cloud_entity_set(entity_code: str | None, release: bool, output: str):
-    """Set ENTITY_CODE as active, or use --release to clear the focus."""
+    """Set ENTITY_CODE as active, or use --clear to clear the focus."""
     if release == (entity_code is not None):
-        raise click.UsageError("Pass exactly one of ENTITY_CODE or --release.")
+        raise click.UsageError("Pass exactly one of ENTITY_CODE or --clear.")
     data = _v1(
         "POST", "/v1/session/active-entity",
         body={"entity_code": None if release else entity_code},
@@ -260,6 +263,78 @@ def cloud_entity_set(entity_code: str | None, release: bool, output: str):
         return
     active = data.get("active_entity") or "all authorized entities"
     console.print(f"[green]✓ Active entity:[/green] [bold]{active}[/bold]")
+
+
+# ── cloud area / cloud location ─────────────────────────────────────────────
+
+HIERARCHY_COLUMNS = [("Code", "code"), ("Name", "name"), ("Parent", "parent_code"), ("Depth", "depth"),
+                     ("Entity", "entity_code")]
+
+
+def _hierarchy_list(path: str, title: str, entity: str | None, parent: str | None, query: str | None,
+                    limit: int, cursor: str | None, output: str) -> None:
+    data = _v1("GET", path, params={"entity_code": entity, "parent_code": parent, "query": query,
+                                     "limit": limit, "cursor": cursor})
+    _list(data, output, key="items", id_key="code", title=title, columns=HIERARCHY_COLUMNS)
+    if output == "table" and (data or {}).get("next_cursor"):
+        console.print(f"  [dim]Next page: --cursor {data['next_cursor']}[/dim]")
+
+
+@cloud.group("area")
+def cloud_area():
+    """Organizational area focus and the visible areas."""
+
+
+@cloud_area.command("set")
+@click.argument("area_code", required=False)
+@click.option("--release", is_flag=True, help="Release the area focus and keep the current entity.")
+@click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
+def cloud_area_set(area_code: str | None, release: bool, output: str):
+    """Set AREA_CODE as active (it also selects its entity), or use --release to clear it."""
+    if release == (area_code is not None):
+        raise click.UsageError("Pass exactly one of AREA_CODE or --release.")
+    data = _v1("POST", "/v1/session/active-area", body={"area_code": None if release else area_code})
+    if output == "json":
+        _emit_json(data)
+        return
+    active = data.get("active_area") or "no area focus"
+    console.print(f"[green]✓ Active area:[/green] [bold]{active}[/bold]  "
+                  f"[dim](entity {data.get('active_entity') or '—'})[/dim]")
+
+
+AREA_OPTIONS = [
+    click.option("--entity", default=None, help="Entity code (defaults to the active entity)"),
+    click.option("--parent", default=None, help="Only the children of this code"),
+    click.option("--query", default=None, help="Text to look for in the name"),
+    click.option("--limit", default=50, show_default=True),
+    click.option("--cursor", default=None, help="Cursor of the next page"),
+    click.option("-o", "--output", type=OUTPUT_LIST, default="table"),
+]
+
+
+def _area_options(command):
+    for option in reversed(AREA_OPTIONS):
+        command = option(command)
+    return command
+
+
+@cloud_area.command("list")
+@_area_options
+def cloud_area_list(entity, parent, query, limit, cursor, output):
+    """List the organizational areas the credential can see."""
+    _hierarchy_list("/v1/areas", "Areas", entity, parent, query, limit, cursor, output)
+
+
+@cloud.group("location")
+def cloud_location():
+    """Document folders: their codes go in --location of search, document list and chat ask."""
+
+
+@cloud_location.command("list")
+@_area_options
+def cloud_location_list(entity, parent, query, limit, cursor, output):
+    """List the document folders the credential can see."""
+    _hierarchy_list("/v1/locations", "Locations", entity, parent, query, limit, cursor, output)
 
 
 # ── cloud group (signed-in person only) ──────────────────────────────────────
@@ -375,10 +450,12 @@ def cloud_document():
 @click.option("--status", default=None, help="Filter by status (e.g. VECTORIZED)")
 @click.option("--limit", default=20, show_default=True)
 @click.option("--page", default=1, show_default=True)
+@click.option("--location", "location_code", default=None, help="Only this visible folder and its subfolders")
 @click.option("-o", "--output", type=OUTPUT_LIST, default="table")
-def cloud_document_list(status: str | None, limit: int, page: int, output: str):
+def cloud_document_list(status: str | None, limit: int, page: int, location_code: str | None, output: str):
     """List documents."""
-    data = _v1("GET", "/v1/documents", params={"status": status, "limit": limit, "page": page})
+    data = _v1("GET", "/v1/documents", params={"status": status, "limit": limit, "page": page,
+                                                "location_code": location_code})
     _list(data, output, key="documents", id_key="code", title=f"Documents (page {page})",
           columns=[("Code", "code"), ("Name", "name"), ("Status", "status"), ("Location", "location_url"), ("KB", "size_kb")])
 
@@ -634,9 +711,11 @@ def cloud_function_show(function_code: str, output: str):
 @click.option("--space", "space_id", type=int, default=None, help="Search only inside this working space")
 @click.option("--filter", "filter_json", default=None,
               help="Structured filter as JSON, @file or - (document_types, attributes, characteristics)")
+@click.option("--location", "location_code", default=None,
+              help="Search only this visible folder and its subfolders (this request only)")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
 def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, entity: str | None,
-                 space_id: int | None, filter_json: str | None, output: str):
+                 space_id: int | None, filter_json: str | None, location_code: str | None, output: str):
     """Semantic search over the group's vectorized documents."""
     text = " ".join(query).strip()
     if not text:
@@ -648,6 +727,8 @@ def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, enti
         body["space_id"] = space_id
     if filter_json:
         body["filter"] = _json_argument(filter_json, "--filter")
+    if location_code:
+        body["location_code"] = location_code
     data = _v1("POST", "/v1/documents/search", body=body)
     if output == "json":
         _emit_json(data)
@@ -671,8 +752,11 @@ def cloud_chat():
 @click.option("--conversation", "conversation_id", type=int, default=None, help="Continue an existing conversation")
 @click.option("--mode", type=click.Choice(["default", "help"]), default=None,
               help="help: answer questions about RAGfly itself (how to use or integrate it), without links to web screens")
+@click.option("--location", "location_code", default=None,
+              help="Answer only from this visible folder and its subfolders (this request only)")
 @click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text")
-def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id: int | None, mode: str | None, output: str):
+def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id: int | None, mode: str | None,
+                   location_code: str | None, output: str):
     """Ask a question. Creates a conversation unless --conversation is given."""
     question = " ".join(message).strip()
     if not question:
@@ -682,6 +766,8 @@ def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id
         body["conversation_id"] = conversation_id
     if mode:
         body["mode"] = mode
+    if location_code:
+        body["location_code"] = location_code
     data = _v1("POST", "/v1/ask", body=body)
     if output == "json":
         _emit_json(data)
