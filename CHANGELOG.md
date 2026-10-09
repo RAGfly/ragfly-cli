@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.21.1 — 2026-10-09
+
+- Package metadata: PyPI now links the source repository.
+
 ## 1.21.0 — 2026-10-08
 
 - New `cloud area set AREA_CODE | set --release | list` and `cloud location list` (`--entity`, `--parent`, `--query`, `--limit`, `--cursor`), matching the SDKs and MCP.
