@@ -47,17 +47,17 @@ def test_every_cloud_call_goes_to_v1_with_the_cli_surface(wire):
     assert call["headers"]["X-RAGfly-Client"] == "cli"
 
 
-def test_entity_set_and_release_use_the_single_public_session_operation(wire):
-    wire.reply = httpx.Response(200, json={"active_entity": "E1"})
-    result = run("cloud", "entity", "set", "E1", "-o", "json")
+def test_workspace_set_and_release_use_the_single_public_session_operation(wire):
+    wire.reply = httpx.Response(200, json={"active_workspace": "E1"})
+    result = run("cloud", "workspace", "set", "E1", "-o", "json")
     assert result.exit_code == 0, result.output
-    assert wire.calls[0]["url"].endswith("/v1/session/active-entity")
-    assert wire.calls[0]["json"] == {"entity_code": "E1"}
+    assert wire.calls[0]["url"].endswith("/v1/session/active-workspace")
+    assert wire.calls[0]["json"] == {"workspace_code": "E1"}
 
-    wire.reply = httpx.Response(200, json={"active_entity": None})
-    result = run("cloud", "entity", "set", "--release", "-o", "json")
+    wire.reply = httpx.Response(200, json={"active_workspace": None})
+    result = run("cloud", "workspace", "set", "--release", "-o", "json")
     assert result.exit_code == 0, result.output
-    assert wire.calls[1]["json"] == {"entity_code": None}
+    assert wire.calls[1]["json"] == {"workspace_code": None}
 
 
 def test_agent_context_and_tool(wire):

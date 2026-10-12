@@ -55,13 +55,13 @@ ragfly
 ├── login / logout / version
 └── cloud                      ← the English REST /v1 contract of api.ragfly.ai
     ├── me
-    ├── entity         set [ENTITY_CODE] | set --clear
+    ├── workspace      set [WORKSPACE_CODE] | set --clear
     ├── area           set [AREA_CODE] | set --release | list
     ├── location       list
     ├── group          list | switch | clear      (signed-in person)
     ├── api-key        create | list | revoke     (signed-in person)
     ├── document       list | show | edges
-    ├── space          list | show | compose | read | refresh | promote
+    ├── collection     list | show | compose | read | refresh | save
     ├── queue          show | runs
     ├── skill          list | show | run
     ├── catalog
@@ -95,10 +95,10 @@ Output is English end to end (`--status VECTORIZED`, `-o json | jq`).
 
 ```bash
 ragfly cloud document list --status VECTORIZED --limit 20 -o id
-ragfly cloud skill run SUMMARIZE_DOCUMENT --space 12
+ragfly cloud skill run SUMMARIZE_DOCUMENT --collection 12
 ragfly cloud search "Q1 revenue"
-ragfly cloud search "statements" --filter @filter.json --space 12
-ragfly cloud chat ask "How do I release the entity of my key?" --mode help
+ragfly cloud search "statements" --filter @filter.json --collection 12
+ragfly cloud chat ask "How do I release the workspace of my key?" --mode help
 ```
 
 Full reference: <https://api.ragfly.ai/docs>.

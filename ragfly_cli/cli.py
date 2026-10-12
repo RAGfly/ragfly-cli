@@ -12,7 +12,8 @@ Commands:
   ragfly cloud group         list | switch | clear      (signed-in person only)
   ragfly cloud api-key       create | list | revoke     (signed-in person only)
   ragfly cloud document      list | show | edges
-  ragfly cloud space         list | show
+  ragfly cloud workspace     set
+  ragfly cloud collection    list | show | compose | read | refresh | save
   ragfly cloud queue         show | runs
   ragfly cloud skill         list | show | run
   ragfly cloud catalog | function show | search | chat ask
@@ -179,8 +180,8 @@ def login(email: str | None, password_stdin: bool):
     console.print()
     console.print(f"[green]✓ Logged in as[/green] {email}")
     usuario = data.get("usuario", {}) if isinstance(data.get("usuario"), dict) else {}
-    console.print(f"  Active group:  {data.get('grupo_activo') or usuario.get('grupo_por_defecto') or '—'}")
-    console.print(f"  Active entity: {data.get('entidad_activa') or usuario.get('entidad_por_defecto') or '—'}")
+    console.print(f"  Active group:      {data.get('grupo_activo') or usuario.get('grupo_por_defecto') or '—'}")
+    console.print(f"  Active workspace:  {data.get('entidad_activa') or usuario.get('entidad_por_defecto') or '—'}")
     console.print("  Session stored in [dim]OS keyring[/dim]")
     console.print()
 
@@ -231,49 +232,49 @@ def cloud_me(output: str):
         _fields("Session", {
             "user": user.get("code"), "name": user.get("name"), "profile": data.get("profile"),
             "roles": ", ".join(data.get("roles") or []), "group": data.get("active_group"),
-            "entity": data.get("active_entity"), "area": data.get("active_area"),
+            "workspace": data.get("active_workspace"), "area": data.get("active_area"),
             "effective_area": data.get("effective_area"),
         }, [("User", "user"), ("Name", "name"), ("Profile", "profile"), ("Roles", "roles"),
-            ("Active group", "group"), ("Active entity", "entity"), ("Active area", "area"),
+            ("Active group", "group"), ("Active workspace", "workspace"), ("Active area", "area"),
             ("Effective area", "effective_area")])
 
 
-# ── cloud entity ────────────────────────────────────────────────────────────
+# ── cloud workspace ────────────────────────────────────────────────────────────
 
-@cloud.group("entity")
-def cloud_entity():
-    """Active entity focus for the authenticated credential."""
+@cloud.group("workspace")
+def cloud_workspace():
+    """Active workspace focus for the authenticated credential."""
 
 
-@cloud_entity.command("set")
-@click.argument("entity_code", required=False)
+@cloud_workspace.command("set")
+@click.argument("workspace_code", required=False)
 @click.option("--clear", "--release", "release", is_flag=True,
-              help="Clear the focus and use all authorized entities (--release is an alias).")
+              help="Clear the focus and use all authorized workspaces (--release is an alias).")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
-def cloud_entity_set(entity_code: str | None, release: bool, output: str):
-    """Set ENTITY_CODE as active, or use --clear to clear the focus."""
-    if release == (entity_code is not None):
-        raise click.UsageError("Pass exactly one of ENTITY_CODE or --clear.")
+def cloud_workspace_set(workspace_code: str | None, release: bool, output: str):
+    """Set WORKSPACE_CODE as active, or use --clear to clear the focus."""
+    if release == (workspace_code is not None):
+        raise click.UsageError("Pass exactly one of WORKSPACE_CODE or --clear.")
     data = _v1(
-        "POST", "/v1/session/active-entity",
-        body={"entity_code": None if release else entity_code},
+        "POST", "/v1/session/active-workspace",
+        body={"workspace_code": None if release else workspace_code},
     )
     if output == "json":
         _emit_json(data)
         return
-    active = data.get("active_entity") or "all authorized entities"
-    console.print(f"[green]✓ Active entity:[/green] [bold]{active}[/bold]")
+    active = data.get("active_workspace") or "all authorized workspaces"
+    console.print(f"[green]✓ Active workspace:[/green] [bold]{active}[/bold]")
 
 
 # ── cloud area / cloud location ─────────────────────────────────────────────
 
 HIERARCHY_COLUMNS = [("Code", "code"), ("Name", "name"), ("Parent", "parent_code"), ("Depth", "depth"),
-                     ("Entity", "entity_code")]
+                     ("Workspace", "workspace_code")]
 
 
-def _hierarchy_list(path: str, title: str, entity: str | None, parent: str | None, query: str | None,
+def _hierarchy_list(path: str, title: str, workspace: str | None, parent: str | None, query: str | None,
                     limit: int, cursor: str | None, output: str) -> None:
-    data = _v1("GET", path, params={"entity_code": entity, "parent_code": parent, "query": query,
+    data = _v1("GET", path, params={"workspace_code": workspace, "parent_code": parent, "query": query,
                                      "limit": limit, "cursor": cursor})
     _list(data, output, key="items", id_key="code", title=title, columns=HIERARCHY_COLUMNS)
     if output == "table" and (data or {}).get("next_cursor"):
@@ -287,10 +288,10 @@ def cloud_area():
 
 @cloud_area.command("set")
 @click.argument("area_code", required=False)
-@click.option("--release", is_flag=True, help="Release the area focus and keep the current entity.")
+@click.option("--release", is_flag=True, help="Release the area focus and keep the current workspace.")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
 def cloud_area_set(area_code: str | None, release: bool, output: str):
-    """Set AREA_CODE as active (it also selects its entity), or use --release to clear it."""
+    """Set AREA_CODE as active (it also selects its workspace), or use --release to clear it."""
     if release == (area_code is not None):
         raise click.UsageError("Pass exactly one of AREA_CODE or --release.")
     data = _v1("POST", "/v1/session/active-area", body={"area_code": None if release else area_code})
@@ -299,11 +300,11 @@ def cloud_area_set(area_code: str | None, release: bool, output: str):
         return
     active = data.get("active_area") or "no area focus"
     console.print(f"[green]✓ Active area:[/green] [bold]{active}[/bold]  "
-                  f"[dim](entity {data.get('active_entity') or '—'})[/dim]")
+                  f"[dim](workspace {data.get('active_workspace') or '—'})[/dim]")
 
 
 AREA_OPTIONS = [
-    click.option("--entity", default=None, help="Entity code (defaults to the active entity)"),
+    click.option("--workspace", default=None, help="Workspace code (defaults to the active workspace)"),
     click.option("--parent", default=None, help="Only the children of this code"),
     click.option("--query", default=None, help="Text to look for in the name"),
     click.option("--limit", default=50, show_default=True),
@@ -320,9 +321,9 @@ def _area_options(command):
 
 @cloud_area.command("list")
 @_area_options
-def cloud_area_list(entity, parent, query, limit, cursor, output):
+def cloud_area_list(workspace, parent, query, limit, cursor, output):
     """List the organizational areas the credential can see."""
-    _hierarchy_list("/v1/areas", "Areas", entity, parent, query, limit, cursor, output)
+    _hierarchy_list("/v1/areas", "Areas", workspace, parent, query, limit, cursor, output)
 
 
 @cloud.group("location")
@@ -332,9 +333,9 @@ def cloud_location():
 
 @cloud_location.command("list")
 @_area_options
-def cloud_location_list(entity, parent, query, limit, cursor, output):
+def cloud_location_list(workspace, parent, query, limit, cursor, output):
     """List the document folders the credential can see."""
-    _hierarchy_list("/v1/locations", "Locations", entity, parent, query, limit, cursor, output)
+    _hierarchy_list("/v1/locations", "Locations", workspace, parent, query, limit, cursor, output)
 
 
 # ── cloud group (signed-in person only) ──────────────────────────────────────
@@ -481,81 +482,81 @@ def cloud_document_edges(document_code: str, neighbor_limit: int):
     _emit_json(_v1("GET", f"/v1/documents/{_segment(document_code)}/edges", params={"neighbor_limit": neighbor_limit}))
 
 
-# ── cloud space ──────────────────────────────────────────────────────────────
+# ── cloud collection ──────────────────────────────────────────────────────────────
 
-@cloud.group("space")
-def cloud_space():
-    """Working spaces."""
+@cloud.group("collection")
+def cloud_collection():
+    """Collections."""
 
 
-@cloud_space.command("list")
+@cloud_collection.command("list")
 @click.option("--limit", default=20, show_default=True)
 @click.option("-o", "--output", type=OUTPUT_LIST, default="table")
-def cloud_space_list(limit: int, output: str):
-    """List working spaces."""
-    data = _v1("GET", "/v1/spaces", params={"limit": limit})
-    _list(data, output, key="spaces", id_key="space_id", title="Working spaces",
-          columns=[("ID", "space_id"), ("Name", "name"), ("Type", "type"), ("Scope", "scope"),
+def cloud_collection_list(limit: int, output: str):
+    """List collections."""
+    data = _v1("GET", "/v1/collections", params={"limit": limit})
+    _list(data, output, key="collections", id_key="collection_id", title="Collections",
+          columns=[("ID", "collection_id"), ("Name", "name"), ("Type", "type"), ("Scope", "scope"),
                    ("Docs", "total_documents"), ("Created", "created_at")])
 
 
-@cloud_space.command("show")
-@click.argument("space_id", type=int)
+@cloud_collection.command("show")
+@click.argument("collection_id", type=int)
 @click.option("--document-limit", default=20, show_default=True)
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
-def cloud_space_show(space_id: int, document_limit: int, output: str):
-    """Show a working space with its documents."""
-    data = _v1("GET", f"/v1/spaces/{space_id}", params={"document_limit": document_limit})
+def cloud_collection_show(collection_id: int, document_limit: int, output: str):
+    """Show a collection with its documents."""
+    data = _v1("GET", f"/v1/collections/{collection_id}", params={"document_limit": document_limit})
     if output == "json":
         _emit_json(data)
         return
-    _fields(f"Working space #{space_id}", data.get("space") or {}, [
+    _fields(f"Collection #{collection_id}", data.get("collection") or {}, [
         ("Name", "name"), ("Type", "type"), ("Scope", "scope"), ("Criterion", "criterion"),
         ("Documents", "total_documents"), ("Created", "created_at"),
     ])
     _table("Documents", data.get("documents") or [], [("Code", "code"), ("Name", "name"), ("Status", "status")])
 
 
-@cloud_space.command("compose")
+@cloud_collection.command("compose")
 @click.argument("operation", type=click.Choice(["union", "intersection", "difference", "symmetric_difference"]))
-@click.argument("space_a", type=int)
-@click.argument("space_b", type=int)
+@click.argument("collection_a", type=int)
+@click.argument("collection_b", type=int)
 @click.option("--name", default="", help="Name of the result (generated when empty)")
-@click.option("--type", "space_type", type=click.Choice(["AREA", "SPACE"]), default="AREA", show_default=True)
+@click.option("--type", "collection_type", type=click.Choice(["TEMPORARY", "SAVED"]), default="TEMPORARY", show_default=True)
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="json")
-def cloud_space_compose(operation: str, space_a: int, space_b: int, name: str, space_type: str, output: str):
-    """Combine two working spaces by set algebra into a new one."""
-    data = _v1("POST", "/v1/spaces/compose", body={
-        "operation": operation, "space_id_a": space_a, "space_id_b": space_b,
-        "name": name, "space_type": space_type,
+def cloud_collection_compose(operation: str, collection_a: int, collection_b: int, name: str, collection_type: str, output: str):
+    """Combine two collections by set algebra into a new one."""
+    data = _v1("POST", "/v1/collections/compose", body={
+        "operation": operation, "collection_id_a": collection_a, "collection_id_b": collection_b,
+        "name": name, "collection_type": collection_type,
     })
-    _emit_json(data) if output == "json" else _fields("New working space", data, [
-        ("ID", "space_id"), ("Name", "name"), ("Type", "type"), ("Documents", "total_documents")])
+    _emit_json(data) if output == "json" else _fields("New collection", data, [
+        ("ID", "collection_id"), ("Name", "name"), ("Type", "type"), ("Documents", "total_documents")])
 
 
-@cloud_space.command("read")
-@click.argument("space_id", type=int)
+@cloud_collection.command("read")
+@click.argument("collection_id", type=int)
 @click.option("--resolution", type=click.Choice(["count", "manifest", "chunks", "text"]), default="manifest", show_default=True)
 @click.option("--query", default="", help="Sub-question to rank by (required with --resolution chunks)")
 @click.option("--limit", type=int, default=50, show_default=True)
-def cloud_space_read(space_id: int, resolution: str, query: str, limit: int):
-    """Read a working space at the chosen resolution (JSON output)."""
-    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/read",
+def cloud_collection_read(collection_id: int, resolution: str, query: str, limit: int):
+    """Read a collection at the chosen resolution (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/collections/{collection_id}/read",
                    body={"resolution": resolution, "query": query, "limit": limit}))
 
 
-@cloud_space.command("refresh")
-@click.argument("space_id", type=int)
-def cloud_space_refresh(space_id: int):
-    """Recompute the members of a working space (JSON output)."""
-    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/refresh"))
+@cloud_collection.command("refresh")
+@click.argument("collection_id", type=int)
+def cloud_collection_refresh(collection_id: int):
+    """Recompute the members of a collection (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/collections/{collection_id}/refresh"))
 
 
-@cloud_space.command("promote")
-@click.argument("space_id", type=int)
-def cloud_space_promote(space_id: int):
-    """Turn a temporary working space into a permanent one (JSON output)."""
-    _emit_json(_v1("POST", f"/v1/spaces/{space_id}/promote"))
+@cloud_collection.command("save")
+@click.argument("collection_id", type=int)
+def cloud_collection_save(collection_id: int):
+    """Save a temporary collection as a saved one (JSON output)."""
+    _emit_json(_v1("POST", f"/v1/collections/{collection_id}/save"))
 
 
 # ── cloud queue ──────────────────────────────────────────────────────────────
@@ -619,14 +620,14 @@ def cloud_skill_show(skill_code: str, output: str):
 
 @cloud_skill.command("run")
 @click.argument("skill_code")
-@click.option("--space", type=int, default=None, help="Working space ID")
+@click.option("--collection", type=int, default=None, help="Collection ID")
 @click.option("--document", default=None, help="Single document code")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
-def cloud_skill_run(skill_code: str, space: int | None, document: str | None, output: str):
-    """Run a skill on a working space or a document."""
-    if not space and not document:
-        raise click.UsageError("Provide --space <ID> or --document <CODE>")
-    body = {k: v for k, v in {"space_id": space, "document_code": document}.items() if v is not None}
+def cloud_skill_run(skill_code: str, collection: int | None, document: str | None, output: str):
+    """Run a skill on a collection or a document."""
+    if not collection and not document:
+        raise click.UsageError("Provide --collection <ID> or --document <CODE>")
+    body = {k: v for k, v in {"collection_id": collection, "document_code": document}.items() if v is not None}
     data = _v1("POST", f"/v1/skills/{_segment(skill_code)}/run", body=body)
     if output == "json":
         _emit_json(data)
@@ -655,15 +656,15 @@ def cloud_catalog(type_: str, output: str):
 
 @cloud.group("document-type")
 def cloud_document_type():
-    """Document types of an entity: the codes `search --filter` accepts."""
+    """Document types of a workspace: the codes `search --filter` accepts."""
 
 
 @cloud_document_type.command("list")
-@click.option("--entity", default=None, help="Entity code (defaults to the active entity)")
+@click.option("--workspace", default=None, help="Workspace code (defaults to the active workspace)")
 @click.option("-o", "--output", type=OUTPUT_LIST, default="table")
-def cloud_document_type_list(entity: str | None, output: str):
-    """List the document types of the entity, with their parent type."""
-    data = _v1("GET", "/v1/catalog/document-types", params={"entity_code": entity})
+def cloud_document_type_list(workspace: str | None, output: str):
+    """List the document types of the workspace, with their parent type."""
+    data = _v1("GET", "/v1/catalog/document-types", params={"workspace_code": workspace})
     _list(data, output, key="document_types", id_key="code", title="Document types",
           columns=[("Code", "code"), ("Name", "name"), ("Parent", "parent_code"), ("Documents", "document_count")])
 
@@ -675,12 +676,12 @@ def cloud_characteristic():
 
 @cloud_characteristic.command("list")
 @click.option("--document-type", "document_types", multiple=True, help="Document type code (repeat for several)")
-@click.option("--entity", default=None, help="Entity code (defaults to the active entity)")
+@click.option("--workspace", default=None, help="Workspace code (defaults to the active workspace)")
 @click.option("-o", "--output", type=OUTPUT_LIST, default="table")
-def cloud_characteristic_list(document_types: tuple[str, ...], entity: str | None, output: str):
+def cloud_characteristic_list(document_types: tuple[str, ...], workspace: str | None, output: str):
     """List the characteristics available for those types (all when none is given)."""
     data = _v1("GET", "/v1/catalog/characteristics", params={
-        "document_types": ",".join(document_types) or None, "entity_code": entity})
+        "document_types": ",".join(document_types) or None, "workspace_code": workspace})
     _list(data, output, key="characteristics", id_key="code", title="Characteristics",
           columns=[("Category", "category_code"), ("Code", "code"), ("Name", "name"), ("Role", "role")])
 
@@ -707,24 +708,24 @@ def cloud_function_show(function_code: str, output: str):
 @click.argument("query", nargs=-1, required=True)
 @click.option("--limit", type=int, default=10, show_default=True)
 @click.option("--min-similarity", type=float, default=0.0, show_default=True)
-@click.option("--entity", default=None, help="Filter by entity code")
-@click.option("--space", "space_id", type=int, default=None, help="Search only inside this working space")
+@click.option("--workspace", default=None, help="Filter by workspace code")
+@click.option("--collection", "collection_id", type=int, default=None, help="Search only inside this collection")
 @click.option("--filter", "filter_json", default=None,
               help="Structured filter as JSON, @file or - (document_types, attributes, characteristics)")
 @click.option("--location", "location_code", default=None,
               help="Search only this visible folder and its subfolders (this request only)")
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
-def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, entity: str | None,
-                 space_id: int | None, filter_json: str | None, location_code: str | None, output: str):
+def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, workspace: str | None,
+                 collection_id: int | None, filter_json: str | None, location_code: str | None, output: str):
     """Semantic search over the group's vectorized documents."""
     text = " ".join(query).strip()
     if not text:
         raise click.UsageError("The query cannot be empty.")
     body = {"query": text, "limit": limit, "min_similarity": min_similarity}
-    if entity:
-        body["entity_code"] = entity
-    if space_id is not None:
-        body["space_id"] = space_id
+    if workspace:
+        body["workspace_code"] = workspace
+    if collection_id is not None:
+        body["collection_id"] = collection_id
     if filter_json:
         body["filter"] = _json_argument(filter_json, "--filter")
     if location_code:
@@ -911,22 +912,22 @@ def cloud_process_update(process_code: str, **fields):
 
 @cloud.group("organization")
 def cloud_organization():
-    """Organization profile (group and entity descriptions and system prompts)."""
+    """Organization profile (group and workspace descriptions and system prompts)."""
 
 
 @cloud_organization.command("show")
-@click.option("--entity", default=None, help="Entity code (default: the active entity)")
-def cloud_organization_show(entity: str | None):
+@click.option("--workspace", default=None, help="Workspace code (default: the active workspace)")
+def cloud_organization_show(workspace: str | None):
     """Show the organization profile (JSON)."""
-    _emit_json(_v1("GET", "/v1/organization", params={"entity_code": entity}))
+    _emit_json(_v1("GET", "/v1/organization", params={"workspace_code": workspace}))
 
 
 @cloud_organization.command("update")
 @click.option("--group-description", default=None)
 @click.option("--group-system-prompt", default=None)
-@click.option("--entity-description", default=None)
-@click.option("--entity-system-prompt", default=None)
-@click.option("--entity", "entity_code", default=None)
+@click.option("--workspace-description", default=None)
+@click.option("--workspace-system-prompt", default=None)
+@click.option("--workspace", "workspace_code", default=None)
 def cloud_organization_update(**fields):
     """Update the organization profile. Only the options you pass are written."""
     body = {k: v for k, v in fields.items() if v is not None}
@@ -938,13 +939,13 @@ def cloud_organization_update(**fields):
 @cloud_organization.command("draft")
 @click.option("--source-file", type=click.Path(exists=True, dir_okay=False), default=None,
               help="Text describing the organization (default: stdin)")
-@click.option("--entity", "entity_code", default=None)
-def cloud_organization_draft(source_file: str | None, entity_code: str | None):
+@click.option("--workspace", "workspace_code", default=None)
+def cloud_organization_draft(source_file: str | None, workspace_code: str | None):
     """Draft the profile texts from a source text (does not write them)."""
     source = Path(source_file).read_text(encoding="utf-8") if source_file else sys.stdin.read()
     body = {"source_text": source}
-    if entity_code:
-        body["entity_code"] = entity_code
+    if workspace_code:
+        body["workspace_code"] = workspace_code
     _emit_json(_v1("POST", "/v1/organization/draft", body=body))
 
 

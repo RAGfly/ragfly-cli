@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0 — 2026-10-12
+
+Breaking: the vocabulary changed. The credential's entity is now a **workspace** and a working space is now a **collection**. There are no aliases: the old commands and options are removed.
+
+- `cloud entity set` -> `cloud workspace set [WORKSPACE_CODE] | --clear` ("Active workspace" in `cloud me` and the login summary).
+- `cloud space list | show | compose | read | refresh | promote` -> `cloud collection list | show | compose | read | refresh | save`. `compose --type` now takes `TEMPORARY` (default) or `SAVED` (formerly `AREA` / `SPACE`).
+- `--entity` -> `--workspace` (`cloud area list`, `cloud location list`, `cloud document-type list`, `cloud characteristic list`, `cloud search`, `cloud organization show | update | draft`).
+- `--space` -> `--collection` (`cloud search`, `cloud skill run`).
+- `cloud organization update`: `--entity-description` / `--entity-system-prompt` -> `--workspace-description` / `--workspace-system-prompt`.
+- Calls `POST /v1/session/active-workspace` and `/v1/collections` (`/{id}`, `/compose`, `/{id}/read`, `/{id}/refresh`, `/{id}/save`); bodies use `workspace_code`, `collection_id`, `collection_id_a` / `collection_id_b` and `collection_type`.
+- Requires a RAGfly Cloud that serves the new `/v1` vocabulary.
+
 ## 1.21.1 — 2026-10-09
 
 - Package metadata: PyPI now links the source repository.
