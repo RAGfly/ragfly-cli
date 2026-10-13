@@ -39,7 +39,6 @@ class ClienteConfig(BaseSettings):
 
     # --- Contexto multi-tenant ---
     codigo_grupo: str = ""
-    codigo_entidad: str = ""
 
     # --- Rutas locales ---
     directorio_documentos: str = ""

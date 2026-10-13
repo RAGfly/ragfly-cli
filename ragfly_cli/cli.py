@@ -179,9 +179,15 @@ def login(email: str | None, password_stdin: bool):
 
     console.print()
     console.print(f"[green]✓ Logged in as[/green] {email}")
-    usuario = data.get("usuario", {}) if isinstance(data.get("usuario"), dict) else {}
-    console.print(f"  Active group:      {data.get('grupo_activo') or usuario.get('grupo_por_defecto') or '—'}")
-    console.print(f"  Active workspace:  {data.get('entidad_activa') or usuario.get('entidad_por_defecto') or '—'}")
+    # The summary reads the public session (`/v1/session`), never the internal
+    # login payload: the CLI speaks workspace, not the backend's own names.
+    try:
+        from .cloud_commands import cloud_request
+        sesion = cloud_request("GET", "/v1/session", token=data.get("access_token") or data.get("token"), timeout=15) or {}
+    except Exception:
+        sesion = {}
+    console.print(f"  Active group:      {sesion.get('active_group') or '—'}")
+    console.print(f"  Active workspace:  {sesion.get('active_workspace') or '—'}")
     console.print("  Session stored in [dim]OS keyring[/dim]")
     console.print()
 

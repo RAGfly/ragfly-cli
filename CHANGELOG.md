@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 — 2026-10-13
+
+- `ragfly login` reads the active group and workspace from the public session (`GET /v1/session`: `active_group`, `active_workspace`) instead of the internal login payload.
+- Removed the unused `RAGFLY_CODIGO_ENTIDAD` setting; an existing value in `config.env` is ignored.
+
 ## 2.0.0 — 2026-10-12
 
 Breaking: the vocabulary changed. The credential's entity is now a **workspace** and a working space is now a **collection**. There are no aliases: the old commands and options are removed.
