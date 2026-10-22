@@ -272,6 +272,18 @@ def cloud_workspace_set(workspace_code: str | None, release: bool, output: str):
     console.print(f"[green]✓ Active workspace:[/green] [bold]{active}[/bold]")
 
 
+@cloud_workspace.command("unset")
+@click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
+def cloud_workspace_unset(output: str):
+    """Release the workspace focus (same as `set --clear`): use all authorized workspaces."""
+    data = _v1("DELETE", "/v1/session/active-workspace")
+    if output == "json":
+        _emit_json(data)
+        return
+    active = data.get("active_workspace") or "all authorized workspaces"
+    console.print(f"[green]✓ Active workspace:[/green] [bold]{active}[/bold]")
+
+
 # ── cloud area / cloud location ─────────────────────────────────────────────
 
 HIERARCHY_COLUMNS = [("Code", "code"), ("Name", "name"), ("Parent", "parent_code"), ("Depth", "depth"),

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- New `cloud workspace unset`: releases the workspace focus of a flexible key (`DELETE /v1/session/active-workspace`), the same as `cloud workspace set --clear`. A fixed-workspace key cannot release its workspace. Requires a RAGfly Cloud that serves that route.
+
 ## 2.0.1 — 2026-10-13
 
 - `ragfly login` reads the active group and workspace from the public session (`GET /v1/session`: `active_group`, `active_workspace`) instead of the internal login payload.

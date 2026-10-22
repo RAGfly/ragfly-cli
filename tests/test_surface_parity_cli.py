@@ -114,3 +114,15 @@ def test_workspace_clear_is_the_published_flag_and_release_stays_an_alias(wire):
     assert run("cloud", "workspace", "set", "--clear").exit_code == 0
     assert run("cloud", "workspace", "set", "--release").exit_code == 0
     assert [c["json"] for c in wire.calls] == [{"workspace_code": None}, {"workspace_code": None}]
+
+
+def test_workspace_unset_calls_the_delete_route_and_matches_set_clear(wire):
+    """`cloud workspace unset` is `DELETE /v1/session/active-workspace`, the same release as `set --clear`."""
+    wire.reply = httpx.Response(200, json={"active_workspace": None})
+    result = run("cloud", "workspace", "unset", "-o", "json")
+    assert result.exit_code == 0, result.output
+    [call] = wire.calls
+    assert call["method"] == "DELETE"
+    assert call["url"].endswith("/v1/session/active-workspace")
+    assert not call.get("json")
+    assert json.loads(result.output) == {"active_workspace": None}

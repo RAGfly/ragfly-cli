@@ -55,7 +55,7 @@ ragfly
 ├── login / logout / version
 └── cloud                      ← the English REST /v1 contract of api.ragfly.ai
     ├── me
-    ├── workspace      set [WORKSPACE_CODE] | set --clear
+    ├── workspace      set [WORKSPACE_CODE] | set --clear | unset
     ├── area           set [AREA_CODE] | set --release | list
     ├── location       list
     ├── group          list | switch | clear      (signed-in person)
