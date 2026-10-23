@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 — 2026-10-23
 
 - New `cloud workspace unset`: releases the workspace focus of a flexible key (`DELETE /v1/session/active-workspace`), the same as `cloud workspace set --clear`. A fixed-workspace key cannot release its workspace. Requires a RAGfly Cloud that serves that route.
 
