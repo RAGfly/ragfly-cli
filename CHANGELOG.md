@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `ragfly cloud search` and `ragfly cloud chat ask` take `--module regulation --country CL [--workspace W] [--area A]` to read a published corpus instead of your documents; the conversation of an ask stays bound to it. Usage stays in your organization.
+- New `ragfly cloud destinations`: published corpora, their regulatory areas, and whether your organization may read them. Requires a RAGfly Cloud that serves `GET /v1/destinations`.
+
 ## 2.1.0 — 2026-10-23
 
 - New `cloud workspace unset`: releases the workspace focus of a flexible key (`DELETE /v1/session/active-workspace`), the same as `cloud workspace set --clear`. A fixed-workspace key cannot release its workspace. Requires a RAGfly Cloud that serves that route.

@@ -126,3 +126,30 @@ def test_workspace_unset_calls_the_delete_route_and_matches_set_clear(wire):
     assert call["url"].endswith("/v1/session/active-workspace")
     assert not call.get("json")
     assert json.loads(result.output) == {"active_workspace": None}
+
+
+def test_search_with_destination(wire):
+    wire.reply = httpx.Response(200, json={"documents": []})
+    result = CliRunner().invoke(app, ["cloud", "search", "board", "meetings", "--module", "regulation",
+                                      "--country", "cl", "--workspace", "MERCADO_VALORES", "-o", "json"])
+    assert result.exit_code == 0, result.output
+    assert wire.calls[0]["json"]["destination"] == {"module": "regulation", "country": "CL",
+                                                     "workspace_code": "MERCADO_VALORES"}
+    assert "workspace_code" not in wire.calls[0]["json"]
+
+
+def test_ask_with_destination_and_destinations(wire):
+    wire.reply = httpx.Response(200, json={"answer": "A", "conversation_id": 1})
+    result = CliRunner().invoke(app, ["cloud", "chat", "ask", "which", "rule?", "--module", "regulation", "--country", "CL"])
+    assert result.exit_code == 0, result.output
+    assert wire.calls[0]["json"]["destination"] == {"module": "regulation", "country": "CL"}
+    wire.reply = httpx.Response(200, json={"destinations": [{"country": "CL", "module": "regulation", "enabled": False,
+                                                             "workspaces": [{"workspace_code": "MERCADO_VALORES"}]}]})
+    result = CliRunner().invoke(app, ["cloud", "destinations", "-o", "json"])
+    assert result.exit_code == 0, result.output
+    assert wire.calls[-1]["method"] == "GET" and wire.calls[-1]["url"].endswith("/v1/destinations")
+
+
+def test_regulation_without_country_is_a_usage_error(wire):
+    result = CliRunner().invoke(app, ["cloud", "search", "x", "--module", "regulation"])
+    assert result.exit_code != 0 and "--country" in result.output

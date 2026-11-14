@@ -722,6 +722,56 @@ def cloud_function_show(function_code: str, output: str):
     _table("Operations", data.get("operations") or [], [("Code", "code"), ("Kind", "kind")])
 
 
+def _destination(module: str | None, country: str | None, workspace: str | None, area: str | None) -> dict | None:
+    """`destination` of /v1 from the CLI options. Only `--module regulation` reads a published corpus."""
+    if not module or module == "private":
+        if country or area:
+            raise click.UsageError("--country and --area need --module regulation.")
+        return None
+    if not country:
+        raise click.UsageError("--module regulation needs --country, e.g. --country CL.")
+    if area and not workspace:
+        raise click.UsageError("--area needs --workspace.")
+    destino = {"module": "regulation", "country": country.upper()}
+    if workspace:
+        destino["workspace_code"] = workspace
+    if area:
+        destino["area_code"] = area
+    return destino
+
+
+_DESTINATION_OPTIONS = [
+    click.option("--module", type=click.Choice(["private", "regulation"]), default=None,
+                 help="regulation: read a published corpus (see `ragfly cloud destinations`) instead of your documents"),
+    click.option("--country", default=None, help="Country of the published corpus, ISO alpha-2 (with --module regulation)"),
+    click.option("--area", default=None, help="Supervisor within --workspace (with --module regulation)"),
+]
+
+
+def _destination_options(func):
+    for opcion in reversed(_DESTINATION_OPTIONS):
+        func = opcion(func)
+    return func
+
+
+@cloud.command("destinations")
+@click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
+def cloud_destinations(output: str):
+    """Published corpora you can read with --module regulation, and whether your organization may."""
+    data = _v1("GET", "/v1/destinations")
+    if output == "json":
+        _emit_json(data)
+        return
+    rows = [{"country": d.get("country"), "module": d.get("module"),
+             "workspaces": ", ".join(w.get("workspace_code") or "" for w in d.get("workspaces") or []),
+             "enabled": "yes" if d.get("enabled") else "no"} for d in data.get("destinations") or []]
+    if not rows:
+        console.print("[yellow]No published corpora.[/yellow]")
+        return
+    _table("Destinations", rows, [("Country", "country"), ("Module", "module"), ("Workspaces", "workspaces"),
+                                  ("Enabled", "enabled")])
+
+
 @cloud.command("search")
 @click.argument("query", nargs=-1, required=True)
 @click.option("--limit", type=int, default=10, show_default=True)
@@ -732,14 +782,21 @@ def cloud_function_show(function_code: str, output: str):
               help="Structured filter as JSON, @file or - (document_types, attributes, characteristics)")
 @click.option("--location", "location_code", default=None,
               help="Search only this visible folder and its subfolders (this request only)")
+@_destination_options
 @click.option("-o", "--output", type=OUTPUT_TABLE, default="table")
 def cloud_search(query: tuple[str, ...], limit: int, min_similarity: float, workspace: str | None,
-                 collection_id: int | None, filter_json: str | None, location_code: str | None, output: str):
-    """Semantic search over the group's vectorized documents."""
+                 collection_id: int | None, filter_json: str | None, location_code: str | None,
+                 module: str | None, country: str | None, area: str | None, output: str):
+    """Semantic search over the group's vectorized documents, or a published corpus with --module regulation."""
     text = " ".join(query).strip()
     if not text:
         raise click.UsageError("The query cannot be empty.")
     body = {"query": text, "limit": limit, "min_similarity": min_similarity}
+    destino = _destination(module, country, workspace, area)
+    if destino:
+        # With a destination, --workspace is a regulatory area of that country, not one of yours.
+        body["destination"] = destino
+        workspace = None
     if workspace:
         body["workspace_code"] = workspace
     if collection_id is not None:
@@ -773,14 +830,23 @@ def cloud_chat():
               help="help: answer questions about RAGfly itself (how to use or integrate it), without links to web screens")
 @click.option("--location", "location_code", default=None,
               help="Answer only from this visible folder and its subfolders (this request only)")
+@click.option("--workspace", default=None, help="Regulatory area of the country (with --module regulation)")
+@_destination_options
 @click.option("-o", "--output", type=click.Choice(["text", "json"]), default="text")
 def cloud_chat_ask(message: tuple[str, ...], function_code: str, conversation_id: int | None, mode: str | None,
-                   location_code: str | None, output: str):
-    """Ask a question. Creates a conversation unless --conversation is given."""
+                   location_code: str | None, workspace: str | None, module: str | None, country: str | None,
+                   area: str | None, output: str):
+    """Ask a question. Creates a conversation unless --conversation is given. With --module regulation the
+    answer comes from that country's published corpus and the conversation stays bound to it."""
     question = " ".join(message).strip()
     if not question:
         raise click.UsageError("The message cannot be empty.")
+    if workspace and module != "regulation":
+        raise click.UsageError("--workspace on ask needs --module regulation.")
     body = {"question": question, "function_code": function_code}
+    destino = _destination(module, country, workspace, area)
+    if destino:
+        body["destination"] = destino
     if conversation_id:
         body["conversation_id"] = conversation_id
     if mode:
